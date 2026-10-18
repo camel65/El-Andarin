@@ -19,6 +19,7 @@
             align-items: center;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: default;
         }
 
         /* Botón de Inicio */
@@ -92,6 +93,9 @@
 </head>
 <body>
 
+    <!-- Audio MP3 del Proyecto -->
+    <audio id="miMusica" src="musica17.mp3" preload="auto" loop></audio>
+
     <!-- Botón de Inicio -->
     <button id="btn-inicio">Inicio</button>
 
@@ -114,6 +118,7 @@
         const canvasContainer = document.getElementById('canvas-container');
         const canvas = document.getElementById('caminantesCanvas');
         const ctx = canvas.getContext('2d');
+        const audioElement = document.getElementById('miMusica');
 
         let animacionId = null;
         let xAbajo = 0;
@@ -122,98 +127,19 @@
         let faseAnimacion = 0;
         let activo = false;
 
-        // Variables de Audio (Volumen Máximo + Compresor + Aceleración de Tempo)
-        let audioCtx = null;
-        let audioActivo = true;
-        let masterGain = null;
-        let compresor = null;
-        let filtro = null;
-        let tiempoBucleMusica = null;
-        let pasoRitmo = 0;
-
         function ajustarCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Posicionar arriba al otro extremo inicialmente
             xArriba = canvas.width;
         }
 
         window.addEventListener('resize', ajustarCanvas);
 
-        // --- SISTEMA DE MÚSICA SINTETIZADA CON ACELERACIÓN ---
-        function reproducirMusicaCaminantes() {
-            if (!audioActivo || !audioCtx || audioCtx.state !== 'running' || !activo) return;
-
-            const tiempoActual = audioCtx.currentTime;
-
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-
-            const notas = [110, 130.81, 146.83, 164.81, 196.00, 220, 246.94, 293.66];
-            let freq = notas[pasoRitmo % notas.length];
-
-            osc.frequency.setValueAtTime(freq, tiempoActual);
-
-            // Volumen máximo absoluto (1.0)
-            gain.gain.setValueAtTime(1.0, tiempoActual);
-            gain.gain.exponentialRampToValueAtTime(0.001, tiempoActual + 0.12);
-
-            osc.connect(gain);
-            gain.connect(filtro);
-            osc.start(tiempoActual);
-            osc.stop(tiempoActual + 0.13);
-
-            pasoRitmo++;
-
-            // El tempo de la música se acelera conforme aumenta la velocidad de caminata
-            let intervaloMs = Math.max(50, 140 - (velocidad * 12));
-            tiempoBucleMusica = setTimeout(reproducirMusicaCaminantes, intervaloMs);
-        }
-
-        function iniciarMusica() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            } else if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-
-            masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(audioActivo ? 1.0 : 0, audioCtx.currentTime);
-
-            compresor = audioCtx.createDynamicsCompressor();
-            compresor.threshold.setValueAtTime(-15, audioCtx.currentTime);
-            compresor.ratio.setValueAtTime(12, audioCtx.currentTime);
-
-            filtro = audioCtx.createBiquadFilter();
-            filtro.type = 'lowpass';
-            filtro.frequency.setValueAtTime(1800, audioCtx.currentTime);
-
-            filtro.connect(compresor);
-            compresor.connect(masterGain);
-            masterGain.connect(audioCtx.destination);
-
-            pasoRitmo = 0;
-            reproducirMusicaCaminantes();
-        }
-
-        function detenerMusica() {
-            if (tiempoBucleMusica) clearTimeout(tiempoBucleMusica);
-            tiempoBucleMusica = null;
-            if (masterGain && audioCtx) {
-                masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
-            }
-        }
-
-        btnAudio.addEventListener('click', () => {
-            audioActivo = !audioActivo;
-            btnAudio.textContent = audioActivo ? "🔊 Sonido: ON" : "🔇 Sonido: OFF";
-            if (masterGain && audioCtx) {
-                masterGain.gain.setValueAtTime(audioActivo ? 1.0 : 0, audioCtx.currentTime);
-                if (audioActivo && activo && !tiempoBucleMusica) {
-                    reproducirMusicaCaminantes();
-                }
-            }
+        // Control del botón de Audio (ON/OFF)
+        btnAudio.addEventListener('click', (e) => {
+            e.stopPropagation();
+            audioElement.muted = !audioElement.muted;
+            btnAudio.textContent = audioElement.muted ? "🔇 Sonido: OFF" : "🔊 Sonido: ON";
         });
 
         // --- CONTROLES DE LA PÁGINA ---
@@ -229,14 +155,22 @@
             faseAnimacion = 0;
             activo = true;
 
+            // Iniciar Audio
+            audioElement.currentTime = 0;
+            audioElement.muted = false;
+            btnAudio.textContent = "🔊 Sonido: ON";
+            audioElement.play().catch(err => console.log(err));
+
             iniciarAnimacion();
-            iniciarMusica();
         });
 
-        btnSalir.addEventListener('click', () => {
+        btnSalir.addEventListener('click', (e) => {
+            e.stopPropagation();
             activo = false;
             if (animacionId) cancelAnimationFrame(animacionId);
-            detenerMusica();
+
+            audioElement.pause();
+            audioElement.currentTime = 0;
 
             canvasContainer.style.display = 'none';
             panelControles.style.display = 'none';
@@ -338,4 +272,3 @@
     </script>
 </body>
 </html>
-
